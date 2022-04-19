@@ -124,8 +124,8 @@ func newRecallWantList() recallWantlist {
 }
 
 // Add want to the pending list
-func (r *recallWantlist) Add(c cid.Cid, priority int32, wtype pb.Message_Wantlist_WantType) {
-	r.pending.Add(c, priority, wtype)
+func (r *recallWantlist) Add(c cid.Cid, priority int32, wtype pb.Message_Wantlist_WantType, token string) {
+	r.pending.Add(c, priority, wtype,token)
 }
 
 // Remove wants from both the pending list and the list of sent wants
@@ -152,7 +152,7 @@ func (r *recallWantlist) MarkSent(e bswl.Entry) bool {
 	if !r.pending.RemoveType(e.Cid, e.WantType) {
 		return false
 	}
-	r.sent.Add(e.Cid, e.Priority, e.WantType)
+	r.sent.Add(e.Cid, e.Priority, e.WantType, e.Token)
 	return true
 }
 
@@ -268,7 +268,7 @@ func newMessageQueue(
 }
 
 // Add want-haves that are part of a broadcast to all connected peers
-func (mq *MessageQueue) AddBroadcastWantHaves(wantHaves []cid.Cid) {
+func (mq *MessageQueue) AddBroadcastWantHaves(wantHaves []cid.Cid, token string) {
 	if len(wantHaves) == 0 {
 		return
 	}
@@ -277,7 +277,7 @@ func (mq *MessageQueue) AddBroadcastWantHaves(wantHaves []cid.Cid) {
 	defer mq.wllock.Unlock()
 
 	for _, c := range wantHaves {
-		mq.bcstWants.Add(c, mq.priority, pb.Message_Wantlist_Have)
+		mq.bcstWants.Add(c, mq.priority, pb.Message_Wantlist_Have,token)
 		mq.priority--
 
 		// We're adding a want-have for the cid, so clear any pending cancel
@@ -290,7 +290,7 @@ func (mq *MessageQueue) AddBroadcastWantHaves(wantHaves []cid.Cid) {
 }
 
 // Add want-haves and want-blocks for the peer for this message queue.
-func (mq *MessageQueue) AddWants(wantBlocks []cid.Cid, wantHaves []cid.Cid) {
+func (mq *MessageQueue) AddWants(wantBlocks []cid.Cid, wantHaves []cid.Cid, token string) {
 	if len(wantBlocks) == 0 && len(wantHaves) == 0 {
 		return
 	}
@@ -299,7 +299,7 @@ func (mq *MessageQueue) AddWants(wantBlocks []cid.Cid, wantHaves []cid.Cid) {
 	defer mq.wllock.Unlock()
 
 	for _, c := range wantHaves {
-		mq.peerWants.Add(c, mq.priority, pb.Message_Wantlist_Have)
+		mq.peerWants.Add(c, mq.priority, pb.Message_Wantlist_Have,token)
 		mq.priority--
 
 		// We're adding a want-have for the cid, so clear any pending cancel
@@ -307,7 +307,7 @@ func (mq *MessageQueue) AddWants(wantBlocks []cid.Cid, wantHaves []cid.Cid) {
 		mq.cancels.Remove(c)
 	}
 	for _, c := range wantBlocks {
-		mq.peerWants.Add(c, mq.priority, pb.Message_Wantlist_Block)
+		mq.peerWants.Add(c, mq.priority, pb.Message_Wantlist_Block,token)
 		mq.priority--
 
 		// We're adding a want-block for the cid, so clear any pending cancel
@@ -742,7 +742,7 @@ func (mq *MessageQueue) extractOutgoingMessage(supportsHave bool) (bsmsg.BitSwap
 	// message, sort by priority and include the high priority ones first.
 
 	for _, e := range peerEntries {
-		msgSize += mq.msg.AddEntry(e.Cid, e.Priority, e.WantType, true)
+		msgSize += mq.msg.AddEntry(e.Cid, e.Priority, e.WantType, e.Token,true)
 		sentPeerEntries++
 
 		if msgSize >= mq.maxMessageSize {
@@ -761,7 +761,7 @@ func (mq *MessageQueue) extractOutgoingMessage(supportsHave bool) (bsmsg.BitSwap
 			wantType = pb.Message_Wantlist_Block
 		}
 
-		msgSize += mq.msg.AddEntry(e.Cid, e.Priority, wantType, false)
+		msgSize += mq.msg.AddEntry(e.Cid, e.Priority, wantType, e.Token,false)
 		sentBcstEntries++
 
 		if msgSize >= mq.maxMessageSize {

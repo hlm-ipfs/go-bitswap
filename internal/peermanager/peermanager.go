@@ -15,8 +15,8 @@ var log = logging.Logger("bs:peermgr")
 
 // PeerQueue provides a queue of messages to be sent for a single peer.
 type PeerQueue interface {
-	AddBroadcastWantHaves([]cid.Cid)
-	AddWants([]cid.Cid, []cid.Cid)
+	AddBroadcastWantHaves([]cid.Cid, string)
+	AddWants([]cid.Cid, []cid.Cid, string)
 	AddCancels([]cid.Cid)
 	ResponseReceived(ks []cid.Cid)
 	Startup()
@@ -134,21 +134,21 @@ func (pm *PeerManager) ResponseReceived(p peer.ID, ks []cid.Cid) {
 // to discover seeds).
 // For each peer it filters out want-haves that have previously been sent to
 // the peer.
-func (pm *PeerManager) BroadcastWantHaves(ctx context.Context, wantHaves []cid.Cid) {
+func (pm *PeerManager) BroadcastWantHaves(ctx context.Context, wantHaves []cid.Cid, token string) {
 	pm.pqLk.Lock()
 	defer pm.pqLk.Unlock()
 
-	pm.pwm.broadcastWantHaves(wantHaves)
+	pm.pwm.broadcastWantHaves(wantHaves,token)
 }
 
 // SendWants sends the given want-blocks and want-haves to the given peer.
 // It filters out wants that have previously been sent to the peer.
-func (pm *PeerManager) SendWants(ctx context.Context, p peer.ID, wantBlocks []cid.Cid, wantHaves []cid.Cid) {
+func (pm *PeerManager) SendWants(ctx context.Context, p peer.ID, wantBlocks []cid.Cid, wantHaves []cid.Cid, token string) {
 	pm.pqLk.Lock()
 	defer pm.pqLk.Unlock()
 
 	if _, ok := pm.peerQueues[p]; ok {
-		pm.pwm.sendWants(p, wantBlocks, wantHaves)
+		pm.pwm.sendWants(p, wantBlocks, wantHaves,token)
 	}
 }
 

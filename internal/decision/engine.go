@@ -4,6 +4,7 @@ package decision
 import (
 	"context"
 	"fmt"
+	"github.com/ipfs/go-bitswap/auth"
 	"sync"
 	"time"
 
@@ -692,13 +693,19 @@ func (e *Engine) MessageReceived(ctx context.Context, p peer.ID, m bsmsg.BitSwap
 		blockSize, found := blockSizes[entry.Cid]
 
 		// Add each want-have / want-block to the ledger
-		l.Wants(c, entry.Priority, entry.WantType)
+		l.Wants(c, entry.Priority, entry.WantType, entry.Token)
 
 		// If the block was not found
 		if !found {
 			log.Debugw("Bitswap engine: block not found", "local", e.self, "from", p, "cid", entry.Cid, "sendDontHave", entry.SendDontHave)
 			sendDontHave(entry)
 		} else {
+			if entry.Token != "" {
+				if err := auth.VerifyRetrievalToken(entry.Token); err != nil {
+					log.Error("token 校验失败 ")
+					continue
+				}
+			}
 			// The block was found, add it to the queue
 			newWorkExists = true
 

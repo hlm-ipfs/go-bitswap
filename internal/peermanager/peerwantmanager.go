@@ -70,7 +70,7 @@ func (pwm *peerWantManager) addPeer(peerQueue PeerQueue, p peer.ID) {
 	// Broadcast any live want-haves to the newly connected peer
 	if pwm.broadcastWants.Len() > 0 {
 		wants := pwm.broadcastWants.Keys()
-		peerQueue.AddBroadcastWantHaves(wants)
+		peerQueue.AddBroadcastWantHaves(wants,"")
 	}
 }
 
@@ -115,7 +115,7 @@ func (pwm *peerWantManager) removePeer(p peer.ID) {
 }
 
 // broadcastWantHaves sends want-haves to any peers that have not yet been sent them.
-func (pwm *peerWantManager) broadcastWantHaves(wantHaves []cid.Cid) {
+func (pwm *peerWantManager) broadcastWantHaves(wantHaves []cid.Cid, token string) {
 	unsent := make([]cid.Cid, 0, len(wantHaves))
 	for _, c := range wantHaves {
 		if pwm.broadcastWants.Has(c) {
@@ -150,14 +150,14 @@ func (pwm *peerWantManager) broadcastWantHaves(wantHaves []cid.Cid) {
 		}
 
 		if len(peerUnsent) > 0 {
-			pws.peerQueue.AddBroadcastWantHaves(peerUnsent)
+			pws.peerQueue.AddBroadcastWantHaves(peerUnsent,token)
 		}
 	}
 }
 
 // sendWants only sends the peer the want-blocks and want-haves that have not
 // already been sent to it.
-func (pwm *peerWantManager) sendWants(p peer.ID, wantBlocks []cid.Cid, wantHaves []cid.Cid) {
+func (pwm *peerWantManager) sendWants(p peer.ID, wantBlocks []cid.Cid, wantHaves []cid.Cid, token string) {
 	fltWantBlks := make([]cid.Cid, 0, len(wantBlocks))
 	fltWantHvs := make([]cid.Cid, 0, len(wantHaves))
 
@@ -226,7 +226,7 @@ func (pwm *peerWantManager) sendWants(p peer.ID, wantBlocks []cid.Cid, wantHaves
 	}
 
 	// Send the want-blocks and want-haves to the peer
-	pws.peerQueue.AddWants(fltWantBlks, fltWantHvs)
+	pws.peerQueue.AddWants(fltWantBlks, fltWantHvs,token)
 }
 
 // sendCancels sends a cancel to each peer to which a corresponding want was

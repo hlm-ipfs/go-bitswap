@@ -38,7 +38,7 @@ type BitSwapMessage interface {
 	PendingBytes() int32
 
 	// AddEntry adds an entry to the Wantlist.
-	AddEntry(key cid.Cid, priority int32, wantType pb.Message_Wantlist_WantType, sendDontHave bool) int
+	AddEntry(key cid.Cid, priority int32, wantType pb.Message_Wantlist_WantType, token string,sendDontHave bool) int
 
 	// Cancel adds a CANCEL for the given CID to the message
 	// Returns the size of the CANCEL entry in the protobuf
@@ -120,6 +120,7 @@ func (e *Entry) ToPB() pb.Message_Wantlist_Entry {
 		Cancel:       e.Cancel,
 		WantType:     e.WantType,
 		SendDontHave: e.SendDontHave,
+		Token:        e.Token,
 	}
 }
 
@@ -202,7 +203,7 @@ func newMessageFromProto(pbm pb.Message) (BitSwapMessage, error) {
 		if !e.Block.Cid.Defined() {
 			return nil, errCidMissing
 		}
-		m.addEntry(e.Block.Cid, e.Priority, e.Cancel, e.WantType, e.SendDontHave)
+		m.addEntry(e.Block.Cid, e.Priority, e.Cancel, e.WantType,e.Token, e.SendDontHave)
 	}
 
 	// deprecated
@@ -307,16 +308,17 @@ func (m *impl) Remove(k cid.Cid) {
 }
 
 func (m *impl) Cancel(k cid.Cid) int {
-	return m.addEntry(k, 0, true, pb.Message_Wantlist_Block, false)
+	return m.addEntry(k, 0, true, pb.Message_Wantlist_Block, "",false)
 }
 
-func (m *impl) AddEntry(k cid.Cid, priority int32, wantType pb.Message_Wantlist_WantType, sendDontHave bool) int {
-	return m.addEntry(k, priority, false, wantType, sendDontHave)
+func (m *impl) AddEntry(k cid.Cid, priority int32, wantType pb.Message_Wantlist_WantType, token string,sendDontHave bool) int {
+	return m.addEntry(k, priority, false, wantType, token,sendDontHave)
 }
 
-func (m *impl) addEntry(c cid.Cid, priority int32, cancel bool, wantType pb.Message_Wantlist_WantType, sendDontHave bool) int {
+func (m *impl) addEntry(c cid.Cid, priority int32, cancel bool, wantType pb.Message_Wantlist_WantType, token string,sendDontHave bool) int {
 	e, exists := m.wantlist[c]
 	if exists {
+		e.Token = token
 		// Only change priority if want is of the same type
 		if e.WantType == wantType {
 			e.Priority = priority
@@ -342,6 +344,7 @@ func (m *impl) addEntry(c cid.Cid, priority int32, cancel bool, wantType pb.Mess
 			Cid:      c,
 			Priority: priority,
 			WantType: wantType,
+			Token: token,
 		},
 		SendDontHave: sendDontHave,
 		Cancel:       cancel,

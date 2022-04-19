@@ -35,10 +35,10 @@ type PeerManager interface {
 	// interested in a peer's connection state
 	UnregisterSession(uint64)
 	// SendWants tells the PeerManager to send wants to the given peer
-	SendWants(ctx context.Context, peerId peer.ID, wantBlocks []cid.Cid, wantHaves []cid.Cid)
+	SendWants(ctx context.Context, peerId peer.ID, wantBlocks []cid.Cid, wantHaves []cid.Cid, token string)
 	// BroadcastWantHaves sends want-haves to all connected peers (used for
 	// session discovery)
-	BroadcastWantHaves(context.Context, []cid.Cid)
+	BroadcastWantHaves(ctx context.Context, list []cid.Cid, token string)
 	// SendCancels tells the PeerManager to send cancels to all peers
 	SendCancels(context.Context, []cid.Cid)
 }
@@ -94,6 +94,7 @@ const (
 type op struct {
 	op   opType
 	keys []cid.Cid
+	token string
 }
 
 // Session holds state for an individual bitswap transfer operation.
@@ -240,8 +241,9 @@ func (s *Session) GetBlocks(ctx context.Context, keys []cid.Cid) (<-chan blocks.
 
 	return bsgetter.AsyncGetBlocks(ctx, s.ctx, keys, s.notif,
 		func(ctx context.Context, keys []cid.Cid) {
+			tt, _ := ctx.Value("order").(string)
 			select {
-			case s.incoming <- op{op: opWant, keys: keys}:
+			case s.incoming <- op{op: opWant, keys: keys, token: tt}:
 			case <-ctx.Done():
 			case <-s.ctx.Done():
 			}
@@ -307,7 +309,7 @@ func (s *Session) run(ctx context.Context) {
 				s.handleReceive(oper.keys)
 			case opWant:
 				// Client wants blocks
-				s.wantBlocks(ctx, oper.keys)
+				s.wantBlocks(ctx, oper.keys, oper.token)
 			case opCancel:
 				// Wants were cancelled
 				s.sw.CancelPending(oper.keys)
@@ -317,7 +319,7 @@ func (s *Session) run(ctx context.Context) {
 				s.sw.WantsSent(oper.keys)
 			case opBroadcast:
 				// Broadcast want-haves to all peers
-				s.broadcast(ctx, oper.keys)
+				s.broadcast(ctx, oper.keys, oper.token)
 			default:
 				panic("unhandled operation")
 			}
@@ -341,7 +343,7 @@ func (s *Session) run(ctx context.Context) {
 // Called when the session hasn't received any blocks for some time, or when
 // all peers in the session have sent DONT_HAVE for a particular set of CIDs.
 // Send want-haves to all connected peers, and search for new peers with the CID.
-func (s *Session) broadcast(ctx context.Context, wants []cid.Cid) {
+func (s *Session) broadcast(ctx context.Context, wants []cid.Cid, token string) {
 	// If this broadcast is because of an idle timeout (we haven't received
 	// any blocks for a while) then broadcast all pending wants
 	if wants == nil {
@@ -349,7 +351,7 @@ func (s *Session) broadcast(ctx context.Context, wants []cid.Cid) {
 	}
 
 	// Broadcast a want-have for the live wants to everyone we're connected to
-	s.broadcastWantHaves(ctx, wants)
+	s.broadcastWantHaves(ctx, wants, token)
 
 	// do not find providers on consecutive ticks
 	// -- just rely on periodic search widening
@@ -380,7 +382,7 @@ func (s *Session) handlePeriodicSearch(ctx context.Context) {
 	// for new providers for blocks.
 	s.findMorePeers(ctx, randomWant)
 
-	s.broadcastWantHaves(ctx, []cid.Cid{randomWant})
+	s.broadcastWantHaves(ctx, []cid.Cid{randomWant},"")
 
 	s.periodicSearchTimer.Reset(s.periodicSearchDelay.NextWaitTime())
 }
@@ -437,7 +439,7 @@ func (s *Session) handleReceive(ks []cid.Cid) {
 }
 
 // wantBlocks is called when blocks are requested by the client
-func (s *Session) wantBlocks(ctx context.Context, newks []cid.Cid) {
+func (s *Session) wantBlocks(ctx context.Context, newks []cid.Cid, token string) {
 	if len(newks) > 0 {
 		// Inform the SessionInterestManager that this session is interested in the keys
 		s.sim.RecordSessionInterest(s.id, newks)
@@ -457,14 +459,14 @@ func (s *Session) wantBlocks(ctx context.Context, newks []cid.Cid) {
 	ks := s.sw.GetNextWants()
 	if len(ks) > 0 {
 		log.Infow("No peers - broadcasting", "session", s.id, "want-count", len(ks))
-		s.broadcastWantHaves(ctx, ks)
+		s.broadcastWantHaves(ctx, ks,token)
 	}
 }
 
 // Send want-haves to all connected peers
-func (s *Session) broadcastWantHaves(ctx context.Context, wants []cid.Cid) {
+func (s *Session) broadcastWantHaves(ctx context.Context, wants []cid.Cid, token string) {
 	log.Debugw("broadcastWantHaves", "session", s.id, "cids", wants)
-	s.pm.BroadcastWantHaves(ctx, wants)
+	s.pm.BroadcastWantHaves(ctx, wants,token)
 }
 
 // The session will broadcast if it has outstanding wants and doesn't receive

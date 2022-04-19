@@ -23,6 +23,7 @@ type Entry struct {
 	Cid      cid.Cid
 	Priority int32
 	WantType pb.Message_Wantlist_WantType
+	Token string
 }
 
 // NewRefEntry creates a new reference tracked wantlist entry.
@@ -53,7 +54,7 @@ func (w *Wantlist) Len() int {
 }
 
 // Add adds an entry in a wantlist from CID & Priority, if not already present.
-func (w *Wantlist) Add(c cid.Cid, priority int32, wantType pb.Message_Wantlist_WantType) bool {
+func (w *Wantlist) Add(c cid.Cid, priority int32, wantType pb.Message_Wantlist_WantType, token string) bool {
 	e, ok := w.set[c]
 
 	// Adding want-have should not override want-block
@@ -65,6 +66,7 @@ func (w *Wantlist) Add(c cid.Cid, priority int32, wantType pb.Message_Wantlist_W
 		Cid:      c,
 		Priority: priority,
 		WantType: wantType,
+		Token: token,
 	})
 
 	return true
@@ -137,6 +139,6 @@ func (w *Wantlist) Absorb(other *Wantlist) {
 	w.cached = nil
 
 	for _, e := range other.Entries() {
-		w.Add(e.Cid, e.Priority, e.WantType)
+		w.Add(e.Cid, e.Priority, e.WantType, e.Token)
 	}
 }
