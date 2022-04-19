@@ -325,7 +325,7 @@ func (s *Session) run(ctx context.Context) {
 			}
 		case <-s.idleTick.C:
 			// The session hasn't received blocks for a while, broadcast
-			s.broadcast(ctx, nil)
+			s.broadcast(ctx, nil,"")
 		case <-s.periodicSearchTimer.C:
 			// Periodically search for a random live want
 			s.handlePeriodicSearch(ctx)
